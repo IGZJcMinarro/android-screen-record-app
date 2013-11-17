@@ -8,6 +8,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Point;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.preference.PreferenceManager;
@@ -25,6 +26,9 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import net.rdrei.android.dirchooser.DirectoryChooserActivity;
+
+import java.io.IOException;
+import java.io.OutputStream;
 
 public class MainActivity extends Activity {
 
@@ -62,8 +66,7 @@ public class MainActivity extends Activity {
         if (preferences.getBoolean("firstrun", true)) {
             // Run a dummy command once to get the
             // superuser request out of the way
-            String[] dummy = {""};
-            tools.runAsRoot(dummy);
+            new SuTask("").execute();
             editor.putBoolean("firstrun", false);
             editor.commit();
         }
@@ -187,11 +190,45 @@ public class MainActivity extends Activity {
         // Handle item selection
         switch (item.getItemId()) {
             case R.id.action_start:
-                String[] command = { tools.formatCommand(timeLimit, saveLocation, bitRate, rotate, videoSize) };
-                tools.runAsRoot(command);
+                String command = tools.formatCommand(timeLimit, saveLocation, bitRate, rotate, videoSize);
+                //tools.runAsRoot(command);
+                new SuTask(command).execute();
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
+        }
+    }
+
+    public class SuTask extends AsyncTask<String, Void, Boolean> {
+        private final String command;
+
+        public SuTask(String command) {
+            super();
+            this.command = command;
+        }
+
+        @Override
+        protected Boolean doInBackground(String... params) {
+            try {
+                Process process = Runtime.getRuntime().exec("su");
+                OutputStream os = process.getOutputStream();
+                Log.i("Screen Record", "Running command " + command);
+                os.write(command.getBytes("ASCII"));
+                Log.i("Screen Record", "Command complete");
+                os.flush();
+                os.close();
+
+                Log.i("Screen Record", "Begin waitFor");
+                process.waitFor();
+                Log.i("Screen Record", "End waitFor");
+                return true;
+            } catch (IOException e) {
+                e.printStackTrace();
+                return false;
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                return false;
+            }
         }
     }
 

@@ -2,6 +2,7 @@ package com.cr5315.screenrecord;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.AsyncTask;
 import android.os.CountDownTimer;
 import android.util.Log;
 import android.widget.TextView;
@@ -9,6 +10,7 @@ import android.widget.Toast;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
@@ -22,21 +24,24 @@ public class Tools {
         this.context = context;
     }
 
-    public boolean runAsRoot(String[] commands) {
+    // Not used in favor of SuTask
+    public boolean runAsRoot(String command) {
         Process process = null;
         try {
-            process = Runtime.getRuntime().exec("su");
-            DataOutputStream os = new DataOutputStream(process.getOutputStream());
+            process = Runtime.getRuntime().exec("su", null, null);
+            OutputStream os = (process.getOutputStream());
+            Log.i("Screen Record", "Running command " + command);
+            os.write(command.getBytes("ASCII"));
 
-            for (String cmd : commands) {
-                Log.i("ScreenRecord", "Running command '" + cmd + "'");
-                os.writeBytes(cmd + "\n");
-            }
-            os.writeBytes("exit");
+            process.waitFor();
+            os.write("exit".getBytes("ASCII"));
             os.flush();
             os.close();
             return true;
         } catch (IOException e) {
+            Log.e("ScreenRecord", e.toString());
+            return false;
+        } catch (InterruptedException e) {
             Log.e("ScreenRecord", e.toString());
             return false;
         }
@@ -44,7 +49,7 @@ public class Tools {
 
     public String formatCommand(int timeLimit, String saveLocation, int bitRate, boolean rotate,
                                 VideoSize videoSize) {
-        String command = "screenrecord " + "--time-limit " +
+        String command = "/system/bin/screenrecord " + "--time-limit " +
                 String.valueOf(timeLimit) + " --bit-rate " + String.valueOf(bitRate) +
                 " --size " + videoSize.asString() + " ";
         if (rotate) {
@@ -52,7 +57,7 @@ public class Tools {
         }
 
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd_HH:mm:ss");
-        command += "'" + saveLocation + simpleDateFormat.format(new Date()) + ".mp4'";
+        command += saveLocation + simpleDateFormat.format(new Date()) + ".mp4";
         return command;
     }
 

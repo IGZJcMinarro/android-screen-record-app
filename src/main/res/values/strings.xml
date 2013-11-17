@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Screen Record</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="action_about">About</string>
+    <string name="action_start">Start Recording</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+
+    <!-- Layout Items -->
+    <string name="summary_title">Current Recording Configuration</string>
+    <string name="recording_time">Recording Time</string>
+    <string name="recording_time_value" formatted="false">%d:%02d</string>
+    <string name="save_location">Save Location</string>
+    <string name="bit_rate">Bit Rate</string>
+    <string name="rotate">Rotate</string>
+    <string name="video_size">Video Size</string>
+
+    <!-- Explanations -->
+    <string name="recording_time_exp">The recording time. Maximum length is 3 minutes.</string>
+    <string name="save_location_exp">The location on your devices internal storage where the video file will be saved.</string>
+    <string name="bit_rate_exp">A higher bit rate will result in a higher quality video, but a larger file size.</string>
+    <string name="rotate_exp">Rotate the video 90 degrees. This feature is experimental.</string>
+    <string name="video_size_exp">The video dimensions. The default value is your device\'s screen resolution.</string>
+
+    <!-- Directory picker strings -->
+    <string name="cancel_label">Cancel</string>
+    <string name="confirm_label">Confirm</string>
+    <string name="selected_folder_label">Selected folder:</string>
+    <string name="create_folder_label">Create folder</string>
+    <string name="create_folder_msg">Create new folder with name "%1$s"?</string>
+    <string name="create_folder_success">Created new folder</string>
+    <string name="create_folder_error_no_write_access">Cannot write to this folder</string>
+    <string name="create_folder_error_already_exists">Folder already exists</string>
+    <string name="create_folder_error">Could not create folder</string>
+    <string name="up_label">Up</string>
+
+</resources>

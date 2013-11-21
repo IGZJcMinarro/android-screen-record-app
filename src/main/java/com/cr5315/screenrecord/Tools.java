@@ -1,6 +1,8 @@
 package com.cr5315.screenrecord;
 
 import android.content.Context;
+import android.content.Intent;
+import android.os.AsyncTask;
 import android.os.CountDownTimer;
 import android.util.Log;
 import android.widget.TextView;
@@ -8,6 +10,9 @@ import android.widget.Toast;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 /**
  * Created by Ben on 11/1/13.
@@ -19,7 +24,8 @@ public class Tools {
         this.context = context;
     }
 
-    public boolean runAsRoot(String[] commands, long millisToRun, TextView textView) {
+    // Not used in favor of SuTask
+    public boolean runAsRoot(String[] commands) {
         Process process = null;
         try {
             process = Runtime.getRuntime().exec("su");
@@ -28,10 +34,6 @@ public class Tools {
             for (String cmd : commands) {
                 Log.i("ScreenRecord", "Running command '" + cmd + "'");
                 os.writeBytes(cmd + "\n");
-                if (cmd.contains("screenrecord")) {
-                    new RecordTimer(millisToRun, 1000, textView).start();
-                    MainActivity.toggleButton(true);
-                }
             }
             os.writeBytes("exit");
             os.flush();
@@ -43,8 +45,24 @@ public class Tools {
         }
     }
 
-    public String formatTime(String minute, String second) {
-        String m = minute; String s = second;
+    public String formatCommand(int timeLimit, String saveLocation, int bitRate, boolean rotate) {
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd_HH:mm:ss");
+        // I don't like doing this, but it make the app work
+        saveLocation = "/sdcard/Screen Record/";
+
+        String command = "screenrecord \"" + saveLocation + simpleDateFormat.format(new Date())
+                + ".mp4\" --time-limit " +
+                String.valueOf(timeLimit) + " --bit-rate " + String.valueOf(bitRate); //+
+                // " --size " + videoSize.asString() + " ";
+        if (rotate) {
+            command += " --rotate ";
+        }
+        // command += saveLocation + simpleDateFormat.format(new Date()) + ".mp4";
+        return command;
+    }
+
+    public String formatTime(int minute, int second) {
+        String m = String.valueOf(minute); String s = String.valueOf(second);
         // minute
         if (m.matches("1")) m = "01";
         else if (m.matches("2")) m = "02";
@@ -89,42 +107,35 @@ public class Tools {
         return s;
     }
 
-    public class RecordTimer extends CountDownTimer {
-        TextView textView;
-        /**
-         * @param millisInFuture    The number of millis in the future from the call
-         *                          to {@link #start()} until the countdown is done and {@link #onFinish()}
-         *                          is called.
-         * @param countDownInterval The interval along the way to receive
-         *                          {@link #onTick(long)} callbacks.
-         */
-        public RecordTimer(long millisInFuture, long countDownInterval, TextView textView) {
-            super(millisInFuture, countDownInterval);
-            this.textView = textView;
+    public int getMinutes(int seconds) {
+        int minutes = 0;
+        for (int sec = 60; sec <= seconds; sec += 60) {
+            minutes++;
         }
-
-        @Override
-        public void onTick(long millisUntilFinished) {
-            if (textView.getVisibility() == TextView.INVISIBLE) textView.setVisibility(TextView.VISIBLE);
-            String minutes = String.valueOf((int) (millisUntilFinished / 1000) / 60);
-            String seconds = String.valueOf((int) (millisUntilFinished / 1000) % 60);
-            textView.setText(formatTime(minutes, seconds));
-        }
-
-        @Override
-        public void onFinish() {
-            textView.setText("");
-            textView.setVisibility(TextView.INVISIBLE);
-            Toast.makeText(context, "Recording finished", Toast.LENGTH_SHORT).show();
-            MainActivity.toggleButton(false);
-        }
+        return minutes;
     }
 
-    public long getMillis(int minutes, int seconds) {
-        return (minutes * 60000) + (seconds * 1000);
+    public int getSeconds(int seconds) {
+        return seconds % 60;
     }
 
-    public long getSeconds(int minutes, int seconds) {
+    public int getTotalSeconds(int minutes, int seconds) {
         return (minutes * 60) + seconds;
+    }
+
+    public String bitRateToString(int bitrate) {
+        String result = "";
+
+        int num = bitrate / 1000000;
+
+        return String.valueOf(num) + "Mbps";
+    }
+
+    public long getMillis(int seconds) {
+        return seconds * 1000;
+    }
+
+    public int getSecondsFromMillis(long millis) {
+        return (int) millis / 1000;
     }
 }

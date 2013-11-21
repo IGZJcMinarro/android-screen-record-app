@@ -1,153 +1,186 @@
 package com.cr5315.screenrecord;
 
 import android.app.Activity;
-import android.app.ActionBar;
 import android.app.AlertDialog;
-import android.app.DownloadManager;
-import android.app.Fragment;
+import android.app.Dialog;
+import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.net.Uri;
+import android.graphics.Point;
+import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.CountDownTimer;
 import android.os.Environment;
 import android.preference.PreferenceManager;
-import android.text.TextWatcher;
 import android.util.Log;
+import android.view.Display;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
-import android.os.Build;
 import android.widget.Button;
 import android.widget.NumberPicker;
+import android.widget.RadioButton;
 import android.widget.TextView;
-import android.widget.TimePicker;
 
 import net.rdrei.android.dirchooser.DirectoryChooserActivity;
 
-import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.concurrent.TimeUnit;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 public class MainActivity extends Activity {
-    static Button button, locationButton;
-    NumberPicker minutes, seconds;
-    TextView locationText, timerText;
-    Tools tools;
+
+    // Gaze upon thee and despair
+
+    private Button bitRateButton, rotateButton, saveLocationButton, timeLimitButton;
+        // videoSizeButton;
+    private TextView summaryTextView;
+
+    private Context context;
+    private SharedPreferences preferences;
+    private SharedPreferences.Editor editor;
+    private Tools tools;
 
     private static int REQUEST_CODE = 5315;
-    private String saveDir;
+
+    protected int timeLimit;
+    private String saveLocation;
+    protected int bitRate;
+    protected boolean rotate;
+    // protected VideoSize videoSize;
+
+    // TODO find out why recording stopped working
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        context = this;
 
+        preferences = PreferenceManager.getDefaultSharedPreferences(this);
+        editor = preferences.edit();
         tools = new Tools(this);
 
-        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
-        if (preferences.getBoolean("firstrun", true)) {
-            String[] swag = { "" };
-            tools.runAsRoot(swag, 0, null);
-            SharedPreferences.Editor editor = preferences.edit();
-            editor.putBoolean("firstrun", false);
+        if (preferences.getBoolean("firstrun2", true)) {
+            // Run a dummy command once to get the
+            // superuser request out of the way
+            tools.runAsRoot(new String[] { "mkdir \"/sdcard/Screen Record\"" });
+            editor.putBoolean("firstrun2", false);
             editor.commit();
         }
 
-        saveDir = Environment.getExternalStorageDirectory().toString();
-        final SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd_HH:mm:ss");
+        initObjects();
+        loadPrefs();
+        updateSummary();
+    }
 
-        button = (Button) findViewById(R.id.button);
-        button.setOnClickListener(new View.OnClickListener() {
+    private void initObjects() {
+        bitRateButton = (Button) findViewById(R.id.bit_rate);
+        bitRateButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                String currentDate = simpleDateFormat.format(new Date());
-                String filename = '"' + saveDir + "/" + currentDate + ".mp4" + '"';
-
-                int recordingMinutes = minutes.getValue();
-                int recordingSeconds = seconds.getValue();
-                long recordingTimeMillis = tools.getMillis(recordingMinutes, recordingSeconds);
-                long recordingTimeSeconds = tools.getSeconds(recordingMinutes, recordingSeconds);
-
-                String[] commandToRun = { "system/bin/screenrecord " + filename + " --time-limit " + String.valueOf(recordingTimeSeconds) };
-                tools.runAsRoot(commandToRun, recordingTimeMillis, timerText);
-
+                Dialog dialog = bitRateDialog((bitRate / 1000000) - 1);
+                dialog.show();
             }
         });
-
-        timerText = (TextView) findViewById(R.id.countdown);
-        minutes = (NumberPicker) findViewById(R.id.minutePicker);
-        seconds = (NumberPicker) findViewById(R.id.secondPicker);
-        initTimePickers();
-
-        locationText = (TextView) findViewById(R.id.location);
-        locationText.setText("Save Location: " + saveDir + "/");
-
-        locationButton = (Button) findViewById(R.id.locationButton);
-        locationButton.setOnClickListener(new View.OnClickListener() {
+        rotateButton = (Button) findViewById(R.id.rotate);
+        rotateButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent = new Intent(MainActivity.this, DirectoryChooserActivity.class);
-                // Optional: Allow users to create a new directory with a fixed name.
-                intent.putExtra(DirectoryChooserActivity.EXTRA_NEW_DIR_NAME,
-                        "Screen Record");
-                startActivityForResult(intent, REQUEST_CODE);
+                setRotate(!rotate);
             }
         });
+        /**
+        saveLocationButton = (Button) findViewById(R.id.save_location);
+        saveLocationButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openDirectoryPicker();
+            }
+        }); **/
+        timeLimitButton = (Button) findViewById(R.id.time_limit);
+        timeLimitButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Dialog dialog = timeLimitDialog(tools.getMinutes(timeLimit),
+                        tools.getSeconds(timeLimit));
+                dialog.show();
+            }
+        });
+        /**
+        videoSizeButton = (Button) findViewById(R.id.video_size);
+        videoSizeButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Dialog dialog = videoSizeDialog();
+                dialog.show();
+            }
+        }); **/
+
+        summaryTextView = (TextView) findViewById(R.id.summary_text);
+    }
+
+    private void loadPrefs() {
+        timeLimit = preferences.getInt("timeLimit", 120);
+        saveLocation = preferences.getString("saveLocation", "/sdcard/");
+        bitRate = preferences.getInt("bitRate", 4000000);
+        rotate = preferences.getBoolean("rotate", false);
+
+        // Video Size
+        /**
+        Display display = getWindowManager().getDefaultDisplay();
+        Point size = new Point();
+        display.getSize(size);
+        int width = size.x;
+        int height = size.y;
+        videoSize = new VideoSize(preferences.getString("videoSize", String.valueOf(width) + VideoSize.divider + String.valueOf(height)));
+         **/
+    }
+
+    private void updateSummary() {
+        String newline = "\n";
+
+        // Minutes
+        String result = getString(R.string.recording_time) + ": " + tools.formatTime(
+                tools.getMinutes(timeLimit), tools.getSeconds(timeLimit)) + newline;
+
+        // Save location
+        // result += getString(R.string.save_location) + ": " + saveLocation + newline;
+
+        // Bit Rate
+        result += getString(R.string.bit_rate) + ": " + tools.bitRateToString(bitRate) + newline;
+
+        // Rotate
+        result += getString(R.string.rotate) + ": ";
+        if (rotate) {
+            result += getString(R.string.yes);
+        } else {
+            result += getString(R.string.no);
+        }
+        // result += newline;
+
+        // Video size
+        // result += getString(R.string.video_size) + ": " + videoSize.asString();
+
+        summaryTextView.setText(result);
+    }
+
+    private void openDirectoryPicker() {
+        Intent intent = new Intent(MainActivity.this, DirectoryChooserActivity.class);
+        intent.putExtra(DirectoryChooserActivity.EXTRA_NEW_DIR_NAME, "Screen Record");
+        startActivityForResult(intent, REQUEST_CODE);
     }
 
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == REQUEST_CODE) {
             if (resultCode == DirectoryChooserActivity.RESULT_CODE_DIR_SELECTED) {
-                // Uri fileDir = data.getData();
-                Log.i("ScreenRecord", data
-                        .getStringExtra(DirectoryChooserActivity.RESULT_SELECTED_DIR));
-                saveDir = data.getStringExtra(DirectoryChooserActivity.RESULT_SELECTED_DIR);
-                locationText.setText("Save Location: " + saveDir + "/");
+                setSaveLocation(data.getStringExtra(DirectoryChooserActivity.RESULT_SELECTED_DIR) + "/");
             }
         }
-    }
-
-    private void initTimePickers() {
-        // Minutes
-        minutes.setMaxValue(3);
-        minutes.setMinValue(0);
-        minutes.setValue(3);
-        minutes.setOnValueChangedListener(new NumberPicker.OnValueChangeListener() {
-            @Override
-            public void onValueChange(NumberPicker picker, int oldVal, int newVal) {
-                if (newVal == 3) {
-                    seconds.setMaxValue(0);
-                    seconds.setMinValue(0);
-                } else {
-                    seconds.setMaxValue(59);
-                    seconds.setMinValue(0);
-                }
-            }
-        });
-
-        //Seconds
-        seconds.setFormatter(new NumberPicker.Formatter() {
-            @Override
-            public String format(int value) {
-                return tools.fomatSeconds(String.valueOf(value));
-            }
-        });
-        seconds.setMinValue(0);
-        seconds.setMaxValue(0);
-        seconds.setValue(0);
-    }
-
-    public static void toggleButton(boolean isRecording) {
-        button.setEnabled(!isRecording);
     }
 
     @Override
@@ -161,14 +194,287 @@ public class MainActivity extends Activity {
     public boolean onOptionsItemSelected(MenuItem item) {
         // Handle item selection
         switch (item.getItemId()) {
-            case R.id.action_settings:
-                AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                builder.setTitle(R.string.action_settings);
-                builder.setMessage(R.string.license);
-                builder.show();
+            case R.id.action_start:
+                String command = tools.formatCommand(timeLimit, saveLocation, bitRate, rotate);
+                //tools.runAsRoot(command);
+                new SuTask(command, timeLimit).execute();
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
         }
     }
+
+    public class SuTask extends AsyncTask<String, Void, Boolean> {
+        private final String command;
+        private final int seconds;
+
+        public SuTask(String command, int seconds) {
+            super();
+            this.command = command;
+            this.seconds = seconds;
+        }
+
+        @Override
+        protected Boolean doInBackground(String... params) {
+            try {
+                Log.i("Screen Record", "Running command as root: " + command);
+                Process process = Runtime.getRuntime().exec("su");
+                DataOutputStream os = new DataOutputStream(process.getOutputStream());
+                os.writeBytes(command);
+                Intent timerIntent = new Intent(context, TimerService.class);
+                timerIntent.putExtra("time", tools.getMillis(seconds));
+                startService(timerIntent);
+                os.writeBytes("exit");
+                os.flush();
+                os.close();
+                return true;
+            } catch (IOException e) {
+                e.printStackTrace();
+                return false;
+            }
+
+            /**try {
+                Process process = Runtime.getRuntime().exec("su");
+                OutputStream os = process.getOutputStream();
+                Log.i("Screen Record", "Running command " + command);
+
+                Intent timerIntent = new Intent(context, TimerService.class);
+                timerIntent.putExtra("time", tools.getMillis(timeLimit));
+                startService(timerIntent);
+
+                os.write(command.getBytes("ASCII"));
+                os.flush();
+                os.close();
+
+                process.waitFor();
+                return true;
+            } catch (IOException e) {
+                e.printStackTrace();
+                return false;
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                return false;
+            } **/
+        }
+    }
+
+    protected void setTimeLimit(int totalSeconds) {
+        timeLimit = totalSeconds;
+        editor.putInt("timeLimit", timeLimit);
+        editor.commit();
+        updateSummary();
+    }
+
+    protected void setSaveLocation(String location) {
+        saveLocation = location;
+        editor.putString("saveLocation", saveLocation);
+        editor.commit();
+        updateSummary();
+    }
+
+    public void setBitRate(int rate) {
+        bitRate = (rate + 1) * 1000000;
+        editor.putInt("bitRate", bitRate);
+        editor.commit();
+        updateSummary();
+    }
+
+    protected void setRotate(boolean doRotate) {
+        rotate = doRotate;
+        editor.putBoolean("rotate", rotate);
+        editor.commit();
+        updateSummary();
+    }
+
+    /** protected void setVideoSize(VideoSize size) {
+        videoSize = size;
+        editor.putString("videoSize", videoSize.toString());
+        editor.commit();
+        updateSummary();
+    } **/
+
+    /**
+     * ListDialog of bit rates
+     * @param selected The item in the list to be selected by default
+     */
+    private Dialog bitRateDialog(int selected) {
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        String[] choices = {"1Mbps", "2Mbps", "3Mbps", "4Mbps", "5Mbps", "6Mbps", "7Mbps", "8Mbps",
+            "9Mbps", "10Mbps", "11Mbps", "12Mbps", "13Mbps", "14Mbps", "15Mbps"};
+
+        builder.setTitle(context.getString(R.string.bit_rate));
+        builder.setSingleChoiceItems(choices, selected, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+
+            }
+        });
+
+        builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                setBitRate(((AlertDialog) dialog).getListView().getCheckedItemPosition());
+            }
+        });
+
+        builder.setNegativeButton(android.R.string.cancel, null);
+
+        return builder.create();
+    }
+
+    private Dialog timeLimitDialog(int totalMinutes, int totalSeconds) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        builder.setTitle(context.getString(R.string.recording_time));
+
+        LayoutInflater inflater = (LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+        View view = inflater.inflate(R.layout.dialog_time_limit, null, false);
+        final NumberPicker minutes = (NumberPicker) view.findViewById(R.id.minutes);
+        final NumberPicker seconds = (NumberPicker) view.findViewById(R.id.seconds);
+
+        minutes.setMaxValue(3);
+        minutes.setMinValue(0);
+        minutes.setValue(totalMinutes);
+        minutes.setOnValueChangedListener(new NumberPicker.OnValueChangeListener() {
+            @Override
+            public void onValueChange(NumberPicker picker, int oldVal, int newVal) {
+                if (newVal == 3) {
+                    seconds.setMaxValue(0);
+                    seconds.setMinValue(0);
+                } else {
+                    seconds.setMaxValue(60);
+                    seconds.setMinValue(0);
+                }
+            }
+        });
+
+        seconds.setMaxValue(60);
+        seconds.setMinValue(0);
+        seconds.setFormatter(new NumberPicker.Formatter() {
+            @Override
+            public String format(int value) {
+                return tools.formatSeconds(String.valueOf(value));
+            }
+        });
+        seconds.setValue(totalSeconds);
+
+        builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                int chosenMinutes = minutes.getValue();
+                int chosenSeconds = seconds.getValue();
+                setTimeLimit(tools.getTotalSeconds(chosenMinutes, chosenSeconds));
+            }
+        });
+
+        builder.setNegativeButton(android.R.string.cancel, null);
+        builder.setView(view);
+        return builder.create();
+    }
+
+    // Video size seems to make the command not work
+    // I'm probably formatting it wrong
+    /**
+    private Dialog videoSizeDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        builder.setTitle(getString(R.string.video_size));
+
+        Display display = getWindowManager().getDefaultDisplay();
+        Point size = new Point();
+        display.getSize(size);
+
+        final int fullWidth = size.x;
+        final int fullHeight = size.y;
+        String fullSize = String.valueOf(fullWidth) + "x" + String.valueOf(fullHeight);
+
+        final int threeFourthsWidth = (int) ((double) fullWidth * (0.75));
+        final int threeFourthHeight = (int) ((double) fullHeight * (0.75));
+        String threeFourthSize = String.valueOf(threeFourthsWidth) + "x" + String.valueOf(threeFourthHeight);
+
+        final int halfWidth = (int) (fullWidth / 2);
+        final int halfHeight = (int) (fullHeight / 2);
+        String halfSize = String.valueOf(halfWidth) + "x" + String.valueOf(halfHeight);
+
+        final int fourthWidth = (int) ((double) fullWidth * (0.25));
+        final int fourthHeight = (int) ((double) fullHeight * (0.25));
+        String fourthSize = String.valueOf(fourthWidth) + "x" + String.valueOf(fourthHeight);
+
+        LayoutInflater inflater = (LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+        View view = inflater.inflate(R.layout.dialog_video_size, null, false);
+
+        final RadioButton full, threeFourths, half, fourth;
+        full = (RadioButton) view.findViewById(R.id.full);
+        threeFourths = (RadioButton) view.findViewById(R.id.three_quarters);
+        half = (RadioButton) view.findViewById(R.id.half);
+        fourth = (RadioButton) view.findViewById(R.id.quarter);
+
+        String savedSize = videoSize.asString();
+        if (savedSize.matches(fullSize)) full.setChecked(true);
+        else if (savedSize.matches(threeFourthSize)) threeFourths.setChecked(true);
+        else if (savedSize.matches(halfSize)) half.setChecked(true);
+        else if (savedSize.matches(fourthSize)) fourth.setChecked(true);
+
+        full.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                threeFourths.setChecked(false);
+                half.setChecked(false);
+                fourth.setChecked(false);
+            }
+        });
+        threeFourths.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                full.setChecked(false);
+                half.setChecked(false);
+                fourth.setChecked(false);
+            }
+        });
+        half.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                threeFourths.setChecked(false);
+                full.setChecked(false);
+                fourth.setChecked(false);
+            }
+        });
+        fourth.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                threeFourths.setChecked(false);
+                half.setChecked(false);
+                full.setChecked(false);
+            }
+        });
+
+        full.setText(fullSize);
+        threeFourths.setText(threeFourthSize);
+        half.setText(halfSize);
+        fourth.setText(fourthSize);
+
+        builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                VideoSize newSize = new VideoSize(fullWidth, fullHeight);
+                if (full.isChecked()) {
+                    // It's already set a full size
+                } else if (threeFourths.isChecked()) {
+                    newSize.setWidth(threeFourthsWidth);
+                    newSize.setHeight(threeFourthHeight);
+                } else if (half.isChecked()) {
+                    newSize.setWidth(halfWidth);
+                    newSize.setHeight(halfHeight);
+                } else if (fourth.isChecked()) {
+                    newSize.setWidth(fourthWidth);
+                    newSize.setHeight(fourthHeight);
+                }
+
+                setVideoSize(newSize);
+            }
+        });
+
+        builder.setNegativeButton(android.R.string.cancel, null);
+        builder.setView(view);
+        return builder.create();
+    } **/
 }

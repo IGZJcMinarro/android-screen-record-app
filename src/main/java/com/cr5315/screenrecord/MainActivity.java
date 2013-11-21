@@ -23,19 +23,20 @@ import android.widget.Button;
 import android.widget.NumberPicker;
 import android.widget.RadioButton;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import net.rdrei.android.dirchooser.DirectoryChooserActivity;
 
+import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 
 public class MainActivity extends Activity {
 
     // Gaze upon thee and despair
 
-    private Button bitRateButton, rotateButton, saveLocationButton, timeLimitButton,
-        videoSizeButton;
+    private Button bitRateButton, rotateButton, saveLocationButton, timeLimitButton;
+        // videoSizeButton;
     private TextView summaryTextView;
 
     private Context context;
@@ -49,9 +50,9 @@ public class MainActivity extends Activity {
     private String saveLocation;
     protected int bitRate;
     protected boolean rotate;
-    protected VideoSize videoSize;
+    // protected VideoSize videoSize;
 
-    // TODO fix bit rate bug
+    // TODO find out why recording stopped working
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,11 +64,11 @@ public class MainActivity extends Activity {
         editor = preferences.edit();
         tools = new Tools(this);
 
-        if (preferences.getBoolean("firstrun", true)) {
+        if (preferences.getBoolean("firstrun2", true)) {
             // Run a dummy command once to get the
             // superuser request out of the way
-            new SuTask("").execute();
-            editor.putBoolean("firstrun", false);
+            tools.runAsRoot(new String[] { "mkdir \"/sdcard/Screen Record\"" });
+            editor.putBoolean("firstrun2", false);
             editor.commit();
         }
 
@@ -92,13 +93,14 @@ public class MainActivity extends Activity {
                 setRotate(!rotate);
             }
         });
+        /**
         saveLocationButton = (Button) findViewById(R.id.save_location);
         saveLocationButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 openDirectoryPicker();
             }
-        });
+        }); **/
         timeLimitButton = (Button) findViewById(R.id.time_limit);
         timeLimitButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -108,6 +110,7 @@ public class MainActivity extends Activity {
                 dialog.show();
             }
         });
+        /**
         videoSizeButton = (Button) findViewById(R.id.video_size);
         videoSizeButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -115,24 +118,26 @@ public class MainActivity extends Activity {
                 Dialog dialog = videoSizeDialog();
                 dialog.show();
             }
-        });
+        }); **/
 
         summaryTextView = (TextView) findViewById(R.id.summary_text);
     }
 
     private void loadPrefs() {
         timeLimit = preferences.getInt("timeLimit", 120);
-        saveLocation = preferences.getString("saveLocation", Environment.getExternalStorageDirectory().toString() + "/");
+        saveLocation = preferences.getString("saveLocation", "/sdcard/");
         bitRate = preferences.getInt("bitRate", 4000000);
         rotate = preferences.getBoolean("rotate", false);
 
         // Video Size
+        /**
         Display display = getWindowManager().getDefaultDisplay();
         Point size = new Point();
         display.getSize(size);
         int width = size.x;
         int height = size.y;
         videoSize = new VideoSize(preferences.getString("videoSize", String.valueOf(width) + VideoSize.divider + String.valueOf(height)));
+         **/
     }
 
     private void updateSummary() {
@@ -143,7 +148,7 @@ public class MainActivity extends Activity {
                 tools.getMinutes(timeLimit), tools.getSeconds(timeLimit)) + newline;
 
         // Save location
-        result += getString(R.string.save_location) + ": " + saveLocation + newline;
+        // result += getString(R.string.save_location) + ": " + saveLocation + newline;
 
         // Bit Rate
         result += getString(R.string.bit_rate) + ": " + tools.bitRateToString(bitRate) + newline;
@@ -155,10 +160,10 @@ public class MainActivity extends Activity {
         } else {
             result += getString(R.string.no);
         }
-        result += newline;
+        // result += newline;
 
         // Video size
-        result += getString(R.string.video_size) + ": " + videoSize.asString();
+        // result += getString(R.string.video_size) + ": " + videoSize.asString();
 
         summaryTextView.setText(result);
     }
@@ -190,9 +195,9 @@ public class MainActivity extends Activity {
         // Handle item selection
         switch (item.getItemId()) {
             case R.id.action_start:
-                String command = tools.formatCommand(timeLimit, saveLocation, bitRate, rotate, videoSize);
+                String command = tools.formatCommand(timeLimit, saveLocation, bitRate, rotate);
                 //tools.runAsRoot(command);
-                new SuTask(command).execute();
+                new SuTask(command, timeLimit).execute();
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
@@ -201,26 +206,47 @@ public class MainActivity extends Activity {
 
     public class SuTask extends AsyncTask<String, Void, Boolean> {
         private final String command;
+        private final int seconds;
 
-        public SuTask(String command) {
+        public SuTask(String command, int seconds) {
             super();
             this.command = command;
+            this.seconds = seconds;
         }
 
         @Override
         protected Boolean doInBackground(String... params) {
             try {
+                Log.i("Screen Record", "Running command as root: " + command);
+                Process process = Runtime.getRuntime().exec("su");
+                DataOutputStream os = new DataOutputStream(process.getOutputStream());
+                os.writeBytes(command);
+                Intent timerIntent = new Intent(context, TimerService.class);
+                timerIntent.putExtra("time", tools.getMillis(seconds));
+                startService(timerIntent);
+                os.writeBytes("exit");
+                os.flush();
+                os.close();
+                return true;
+            } catch (IOException e) {
+                e.printStackTrace();
+                return false;
+            }
+
+            /**try {
                 Process process = Runtime.getRuntime().exec("su");
                 OutputStream os = process.getOutputStream();
                 Log.i("Screen Record", "Running command " + command);
+
+                Intent timerIntent = new Intent(context, TimerService.class);
+                timerIntent.putExtra("time", tools.getMillis(timeLimit));
+                startService(timerIntent);
+
                 os.write(command.getBytes("ASCII"));
-                Log.i("Screen Record", "Command complete");
                 os.flush();
                 os.close();
 
-                Log.i("Screen Record", "Begin waitFor");
                 process.waitFor();
-                Log.i("Screen Record", "End waitFor");
                 return true;
             } catch (IOException e) {
                 e.printStackTrace();
@@ -228,7 +254,7 @@ public class MainActivity extends Activity {
             } catch (InterruptedException e) {
                 e.printStackTrace();
                 return false;
-            }
+            } **/
         }
     }
 
@@ -260,12 +286,12 @@ public class MainActivity extends Activity {
         updateSummary();
     }
 
-    protected void setVideoSize(VideoSize size) {
+    /** protected void setVideoSize(VideoSize size) {
         videoSize = size;
         editor.putString("videoSize", videoSize.toString());
         editor.commit();
         updateSummary();
-    }
+    } **/
 
     /**
      * ListDialog of bit rates
@@ -274,7 +300,8 @@ public class MainActivity extends Activity {
     private Dialog bitRateDialog(int selected) {
 
         AlertDialog.Builder builder = new AlertDialog.Builder(context);
-        String[] choices = {"1Mbps", "2Mbps", "3Mbps", "4Mbps", "5Mbps", "6Mbps", "7Mbps"};
+        String[] choices = {"1Mbps", "2Mbps", "3Mbps", "4Mbps", "5Mbps", "6Mbps", "7Mbps", "8Mbps",
+            "9Mbps", "10Mbps", "11Mbps", "12Mbps", "13Mbps", "14Mbps", "15Mbps"};
 
         builder.setTitle(context.getString(R.string.bit_rate));
         builder.setSingleChoiceItems(choices, selected, new DialogInterface.OnClickListener() {
@@ -345,6 +372,9 @@ public class MainActivity extends Activity {
         return builder.create();
     }
 
+    // Video size seems to make the command not work
+    // I'm probably formatting it wrong
+    /**
     private Dialog videoSizeDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setTitle(getString(R.string.video_size));
@@ -446,5 +476,5 @@ public class MainActivity extends Activity {
         builder.setNegativeButton(android.R.string.cancel, null);
         builder.setView(view);
         return builder.create();
-    }
+    } **/
 }

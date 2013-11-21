@@ -129,16 +129,20 @@ public class DirectoryChooserActivity extends Activity {
         });
 
         // change up button to light version if using dark theme
+        // cr5315 2013-11-17: We don't need this since the app
+        // is always Holo Light
+        /**
         TypedArray backgroundAttributes = getTheme().obtainStyledAttributes(
                 new int[] { android.R.attr.colorBackground });
         int color = backgroundAttributes.getColor(0, 0xFFFFFF);
         backgroundAttributes.recycle();
         // convert to greyscale and check if < 128
+
         if (color != 0xFFFFFF && 0.21 * Color.red(color) +
                                  0.72 * Color.green(color) +
                                  0.07 * Color.blue(color) < 128) {
             mBtnNavUp.setImageResource(R.drawable.navigation_up_light);
-        }
+        } **/
 
         mFilenames = new ArrayList<String>();
         mListDirectoriesAdapter = new ArrayAdapter<String>(this,

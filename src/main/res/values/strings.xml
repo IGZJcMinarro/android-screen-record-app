@@ -2,16 +2,16 @@
 <resources>
 
     <string name="app_name">Screen Record</string>
-    <string name="hello_world">Hello world!</string>
     <string name="action_about">About</string>
     <string name="action_start">Start Recording</string>
     <string name="yes">Yes</string>
     <string name="no">No</string>
+    <string name="recording">Recording</string>
+    <string name="recording_time_left" formatted="false">%d:%02d</string>
 
     <!-- Layout Items -->
     <string name="summary_title">Current Recording Configuration</string>
     <string name="recording_time">Recording Time</string>
-    <string name="recording_time_value" formatted="false">%d:%02d</string>
     <string name="save_location">Save Location</string>
     <string name="bit_rate">Bit Rate</string>
     <string name="rotate">Rotate</string>

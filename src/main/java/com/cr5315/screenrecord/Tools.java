@@ -25,39 +25,39 @@ public class Tools {
     }
 
     // Not used in favor of SuTask
-    public boolean runAsRoot(String command) {
+    public boolean runAsRoot(String[] commands) {
         Process process = null;
         try {
-            process = Runtime.getRuntime().exec("su", null, null);
-            OutputStream os = (process.getOutputStream());
-            Log.i("Screen Record", "Running command " + command);
-            os.write(command.getBytes("ASCII"));
+            process = Runtime.getRuntime().exec("su");
+            DataOutputStream os = new DataOutputStream(process.getOutputStream());
 
-            process.waitFor();
-            os.write("exit".getBytes("ASCII"));
+            for (String cmd : commands) {
+                Log.i("ScreenRecord", "Running command '" + cmd + "'");
+                os.writeBytes(cmd + "\n");
+            }
+            os.writeBytes("exit");
             os.flush();
             os.close();
             return true;
         } catch (IOException e) {
             Log.e("ScreenRecord", e.toString());
             return false;
-        } catch (InterruptedException e) {
-            Log.e("ScreenRecord", e.toString());
-            return false;
         }
     }
 
-    public String formatCommand(int timeLimit, String saveLocation, int bitRate, boolean rotate,
-                                VideoSize videoSize) {
-        String command = "/system/bin/screenrecord " + "--time-limit " +
-                String.valueOf(timeLimit) + " --bit-rate " + String.valueOf(bitRate) +
-                " --size " + videoSize.asString() + " ";
-        if (rotate) {
-            command += "--rotate ";
-        }
-
+    public String formatCommand(int timeLimit, String saveLocation, int bitRate, boolean rotate) {
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd_HH:mm:ss");
-        command += saveLocation + simpleDateFormat.format(new Date()) + ".mp4";
+        // I don't like doing this, but it make the app work
+        saveLocation = "/sdcard/Screen Record/";
+
+        String command = "screenrecord \"" + saveLocation + simpleDateFormat.format(new Date())
+                + ".mp4\" --time-limit " +
+                String.valueOf(timeLimit) + " --bit-rate " + String.valueOf(bitRate); //+
+                // " --size " + videoSize.asString() + " ";
+        if (rotate) {
+            command += " --rotate ";
+        }
+        // command += saveLocation + simpleDateFormat.format(new Date()) + ".mp4";
         return command;
     }
 
@@ -129,5 +129,13 @@ public class Tools {
         int num = bitrate / 1000000;
 
         return String.valueOf(num) + "Mbps";
+    }
+
+    public long getMillis(int seconds) {
+        return seconds * 1000;
+    }
+
+    public int getSecondsFromMillis(long millis) {
+        return (int) millis / 1000;
     }
 }

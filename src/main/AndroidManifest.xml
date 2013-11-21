@@ -28,6 +28,9 @@
 
         <activity android:name="net.rdrei.android.dirchooser.DirectoryChooserActivity" />
 
+        <service android:name=".TimerService"
+            android:process=":screenrecord_timer_service" />
+
     </application>
 
 </manifest>

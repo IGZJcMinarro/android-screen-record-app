@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <color name="bright_blue">#33B5E5</color>
-
-    <color name="selection_background_color">#286E8A</color>
+    <color name="selection_background_color">#bebebe</color>
 
 </resources>

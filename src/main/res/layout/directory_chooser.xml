@@ -62,7 +62,7 @@
             android:layout_alignParentTop="true"
             android:background="@drawable/borderless_button"
             android:contentDescription="@string/up_label"
-            android:src="@drawable/navigation_up" />
+            android:src="@drawable/ic_navigation_up" />
 
         <TextView
             android:id="@+id/txtvSelectedFolderLabel"
@@ -94,7 +94,7 @@
             android:layout_width="match_parent"
             android:layout_height="1dp"
             android:layout_below="@id/btnNavUp"
-            android:background="@color/bright_blue" />
+            android:background="@color/selection_background_color" />
     </RelativeLayout>
 
     <ListView
